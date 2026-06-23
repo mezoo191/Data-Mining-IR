@@ -6,16 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from news_search import SearchEngine, build_index, load_corpus
+from news_search import Document, SearchEngine, build_index, load_corpus
+from news_search import ranking
 from news_search.index import InvertedIndex
 
 SAMPLE = Path(__file__).resolve().parents[1] / "data" / "sample_news.jsonl"
-
-
-@pytest.fixture(scope="module")
-def engine() -> SearchEngine:
-    docs = load_corpus(SAMPLE)
-    return SearchEngine(build_index(docs, verbose=False))
 
 
 def test_corpus_loads():
@@ -55,8 +50,87 @@ def test_empty_and_nonsense_queries(engine):
 
 
 def test_category_filter(engine):
-    res = engine.search("the", method="tfidf", top_k=30, category="POLITICS")
+    # 'health' is a real content word (not a stopword), so this actually exercises
+    # the filter — the old test used the stopword 'the' and passed vacuously.
+    res = engine.search("health", method="bm25", top_k=30, category="POLITICS")
     assert all(r["category"] == "POLITICS" for r in res.results)
+
+
+def _make_engine_with_categories() -> SearchEngine:
+    """Synthetic corpus: 8 POLITICS + 3 SPORTS docs all containing 'reform'."""
+    docs = []
+    for i in range(8):
+        docs.append(Document(id=i, text="reform policy senate vote",
+                             headline="h", short_description="reform policy senate vote",
+                             category="POLITICS", date="", link="https://example.com"))
+    for i in range(8, 11):
+        docs.append(Document(id=i, text="reform team game season",
+                             headline="h", short_description="reform team game season",
+                             category="SPORTS", date="", link="https://example.com"))
+    return SearchEngine(build_index(docs, verbose=False))
+
+
+def test_category_filter_restricts_before_truncation():
+    """Regression for the bug where the category filter ran *after* top_k
+    truncation, silently dropping relevant in-category docs ranked below top_k."""
+    eng = _make_engine_with_categories()
+    full = eng.search("reform", method="bm25", top_k=100, category="POLITICS")
+    assert full.total_hits == 8
+    assert all(r["category"] == "POLITICS" for r in full.results)
+
+    limited = eng.search("reform", method="bm25", top_k=3, category="POLITICS")
+    assert len(limited.results) == 3              # page filled from within the category
+    assert limited.total_hits == 8               # honest total, not capped at top_k
+    assert all(r["category"] == "POLITICS" for r in limited.results)
+
+
+def test_category_with_no_docs_returns_empty(engine):
+    res = engine.search("health", category="NO_SUCH_CATEGORY_XYZ")
+    assert res.total_hits == 0
+    assert res.results == []
+
+
+def test_total_hits_is_true_count_not_capped(engine):
+    # Use the most frequent indexed term so we know many docs match.
+    term = max(engine.index.postings, key=lambda t: len(engine.index.postings[t]))
+    page = engine.search(term, method="bm25", top_k=5)
+    full = engine.search(term, method="bm25", top_k=10_000)
+    assert page.total_hits == full.total_hits      # total independent of page size
+    assert page.total_hits > 5                      # more matches than one page
+    assert len(page.results) == 5                   # page filled to top_k
+    assert len(full.results) == full.total_hits     # everything returned when top_k huge
+
+
+def test_ranking_and_mode_requires_all_terms(engine):
+    by_df = sorted(engine.index.postings, key=lambda t: len(engine.index.postings[t]),
+                   reverse=True)
+    t1, t2 = by_df[0], by_df[3]
+    or_hits = ranking.bm25([t1, t2], engine.index, top_k=None, mode="or")
+    and_hits = ranking.bm25([t1, t2], engine.index, top_k=None, mode="and")
+    assert len(and_hits) <= len(or_hits)
+    for doc_id, _ in and_hits:
+        fwd = engine.index.forward[doc_id]
+        assert t1 in fwd and t2 in fwd  # 'and' docs contain every term
+
+
+def test_ranking_restrict_to_limits_candidates(engine):
+    term = max(engine.index.postings, key=lambda t: len(engine.index.postings[t]))
+    allowed = set(list(engine.index.meta)[:3])
+    res = ranking.bm25([term], engine.index, top_k=None, mode="or", restrict_to=allowed)
+    assert {doc_id for doc_id, _ in res}.issubset(allowed)
+
+
+def test_bert_method_without_bert_is_graceful(engine):
+    # engine.bert is None -> bert expansion contributes nothing but must not error
+    res = engine.search("health", method="bert", top_k=5)
+    assert res.method == "bert"
+    assert res.expansion_terms == []
+
+
+def test_prf_bert_without_bert_still_uses_prf(engine):
+    res = engine.search("health", method="prf+bert", top_k=5)
+    assert res.method == "prf+bert"
+    assert isinstance(res.expansion_terms, list)  # PRF terms only (no bert)
 
 
 def test_prf_adds_expansion_terms(engine):

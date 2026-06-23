@@ -1,5 +1,4 @@
 # Optional dependencies for BERT-based semantic query expansion.
 # These are large (PyTorch). Only needed for the "bert" / "prf+bert" methods.
 numpy>=1.24
-scikit-learn>=1.3
 sentence-transformers>=2.2

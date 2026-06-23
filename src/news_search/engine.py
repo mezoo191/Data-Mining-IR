@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
@@ -88,23 +88,27 @@ class SearchEngine:
         expansion_terms = [t for t in expansion_terms if not (t in seen or seen.add(t))]
         all_terms = query_terms + expansion_terms
 
+        # --- optional category filter --------------------------------- #
+        # Restrict the candidate set *before* ranking/truncation so a filtered
+        # search still returns the true top_k within that category (rather than
+        # only whichever category docs happened to land in the global top_k).
+        restrict: Optional[set] = None
+        if category:
+            restrict = self.index.category_docs(category)
+            if not restrict:
+                elapsed_ms = (time.perf_counter() - start) * 1000
+                return SearchResult(query, method, elapsed_ms, expansion_terms, 0, [])
+
         # --- retrieve & rank ------------------------------------------ #
         # BM25 is the default ranker; "tfidf" keeps the classic scorer for
         # comparison. Expansion terms use OR retrieval so new docs can surface.
-        if method == "tfidf":
-            ranked = ranking.score(all_terms, self.index, top_k=top_k, mode="or")
-        else:
-            ranked = ranking.bm25(all_terms, self.index, top_k=top_k, mode="or")
+        # top_k=None ranks every match so total_hits is an honest count.
+        ranker = ranking.score if method == "tfidf" else ranking.bm25
+        ranked = ranker(all_terms, self.index, top_k=None, mode="or", restrict_to=restrict)
 
-        # --- optional category filter --------------------------------- #
         results: List[dict] = []
-        rank = 0
-        for doc_id, sc in ranked:
-            meta = self.index.meta[doc_id]
-            if category and meta.get("category") != category:
-                continue
-            rank += 1
-            row = dict(meta)
+        for rank, (doc_id, sc) in enumerate(ranked[:top_k], start=1):
+            row = dict(self.index.meta[doc_id])
             row["score"] = round(sc, 5)
             row["rank"] = rank
             results.append(row)
@@ -115,7 +119,7 @@ class SearchEngine:
             method=method,
             elapsed_ms=elapsed_ms,
             expansion_terms=expansion_terms,
-            total_hits=len(results),
+            total_hits=len(ranked),  # true number of matching docs (not capped at top_k)
             results=results,
         )
 

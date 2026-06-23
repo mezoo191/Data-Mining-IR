@@ -7,7 +7,6 @@ the most meaningful metric), but it lets us compare methods automatically.
 """
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from typing import Dict, List, Set
 

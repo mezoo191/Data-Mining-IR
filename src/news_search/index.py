@@ -20,7 +20,7 @@ import pickle
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 from .corpus import Document
 from .preprocess import Preprocessor
@@ -33,6 +33,7 @@ class InvertedIndex:
     idf: Dict[str, float] = field(default_factory=dict)
     forward: Dict[int, Dict[str, int]] = field(default_factory=dict)
     meta: Dict[int, dict] = field(default_factory=dict)  # doc_id -> display metadata
+    cat_index: Dict[str, List[int]] = field(default_factory=dict)  # category -> doc_ids
     num_docs: int = 0
     avg_doc_len: float = 0.0  # mean document length (for BM25 length normalisation)
 
@@ -43,6 +44,16 @@ class InvertedIndex:
 
     def df(self, term: str) -> int:
         return len(self.postings.get(term, ()))
+
+    def category_docs(self, category: str) -> Set[int]:
+        """All doc_ids in ``category`` (used to filter *before* ranking).
+
+        Falls back to a meta scan for indexes pickled before ``cat_index`` existed.
+        """
+        cat_index = getattr(self, "cat_index", None)
+        if cat_index:
+            return set(cat_index.get(category, ()))
+        return {doc_id for doc_id, m in self.meta.items() if m.get("category") == category}
 
     def tfidf(self, term: str, doc_id: int, term_freq: int) -> float:
         """Normalised TF * IDF for a single (term, doc)."""
@@ -81,6 +92,7 @@ def build_index(
         tokens = pre.tokenize(doc.text)
         index.doc_len[doc.id] = len(tokens)
         index.meta[doc.id] = doc.to_meta()
+        index.cat_index.setdefault(doc.category, []).append(doc.id)
 
         term_freqs: Dict[str, int] = {}
         for tok in tokens:

@@ -41,6 +41,10 @@ state: dict = {}
 
 
 def _load_engine() -> SearchEngine:
+    # NOTE: index.pkl / bert.pkl are loaded with ``pickle``, which executes
+    # arbitrary code on load. These artifacts are produced locally by
+    # ``scripts/build_index.py`` and are trusted; never point INDEX_PATH at a
+    # file from an untrusted source.
     if INDEX_PATH.exists():
         print(f"Loading index from {INDEX_PATH}")
         index = InvertedIndex.load(INDEX_PATH)
@@ -74,17 +78,35 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="News Search Engine API", version="1.0.0", lifespan=lifespan)
 
+# CORS is only needed for the Vite dev server (npm run dev on :5173); the built
+# app is served same-origin from :8000. Scope to localhost dev origins by default;
+# override with a comma-separated CORS_ORIGINS env var if deploying elsewhere.
+_CORS_ORIGINS = [
+    o.strip()
+    for o in os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://localhost:8000"
+    ).split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_CORS_ORIGINS,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
 
 
+def _engine() -> SearchEngine:
+    """Return the loaded engine or a clean 503 if startup hasn't finished."""
+    engine = state.get("engine")
+    if engine is None:
+        raise HTTPException(503, "Search engine is not ready yet.")
+    return engine
+
+
 @app.get("/api/health")
 def health():
-    engine: SearchEngine = state["engine"]
+    engine = _engine()
     return {
         "status": "ok",
         "documents": engine.index.num_docs,
@@ -96,18 +118,22 @@ def health():
 
 @app.get("/api/categories")
 def categories():
-    engine: SearchEngine = state["engine"]
+    engine = _engine()
     return {"categories": engine.categories}
 
 
 @app.get("/api/search")
 def search(
-    q: str = Query(..., min_length=1, description="Search query"),
-    method: str = Query("tfidf", description=f"One of {METHODS}"),
+    q: str = Query(..., min_length=1, max_length=512, description="Search query"),
+    method: Optional[str] = Query(None, description=f"One of {METHODS}; defaults to BERT"),
     top_k: int = Query(10, ge=1, le=50),
-    category: Optional[str] = Query(None),
+    category: Optional[str] = Query(None, max_length=100),
 ):
-    engine: SearchEngine = state["engine"]
+    engine = _engine()
+    # Default to BERT (the best method) when it's available, else BM25 so a bare
+    # request never fails on a lite (no-BERT) deployment.
+    if method is None:
+        method = "bert" if engine.bert is not None else "bm25"
     if method not in METHODS:
         raise HTTPException(400, f"Unknown method '{method}'. Choose from {list(METHODS)}.")
     if method in ("bert", "prf+bert") and engine.bert is None:

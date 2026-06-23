@@ -63,14 +63,21 @@ def wordnet_terms(
 
     qset = set(query_terms)
     added: List[str] = []
+    seen: set = set()
     for token in query_terms:
-        for syn in wordnet.synsets(token)[:3]:
-            for lemma in syn.lemmas()[:2]:
+        per_token = 0
+        for syn in wordnet.synsets(token):
+            if per_token >= max_per_term:
+                break
+            for lemma in syn.lemmas():
                 word = lemma.name().replace("_", " ").lower()
                 stemmed = preprocessor.stem(word)
-                if stemmed not in qset and stemmed not in added:
-                    added.append(stemmed)
-                if len([a for a in added]) >= max_per_term * len(query_terms):
+                if stemmed in qset or stemmed in seen:
+                    continue
+                seen.add(stemmed)
+                added.append(stemmed)
+                per_token += 1
+                if per_token >= max_per_term:  # cap synonyms *per query term*
                     break
     return added
 

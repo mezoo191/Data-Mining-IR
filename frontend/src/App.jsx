@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 
 const METHODS = [
-  { id: "bm25", label: "BM25", hint: "Modern ranking (default)" },
+  { id: "bm25", label: "BM25", hint: "Modern ranking" },
   { id: "tfidf", label: "TF-IDF", hint: "Classic ranking, for comparison" },
   { id: "prf", label: "Relevance Feedback", hint: "BM25 + pseudo-relevance feedback" },
   { id: "wordnet", label: "WordNet", hint: "BM25 + synonym expansion" },
-  { id: "bert", label: "BERT", hint: "BM25 + semantic embeddings" },
+  { id: "bert", label: "BERT", hint: "BM25 + semantic embeddings (default)" },
   { id: "prf+bert", label: "PRF + BERT", hint: "BM25 + hybrid expansion" },
 ];
+
+// Only allow http(s) links through to href; guards against javascript:/data:
+// URLs sneaking in from the dataset (defensive — the dataset is trusted).
+function safeUrl(url) {
+  return typeof url === "string" && /^https?:\/\//i.test(url) ? url : "#";
+}
 
 const EXAMPLES = [
   "covid vaccine health",
@@ -19,7 +25,7 @@ const EXAMPLES = [
 
 export default function App() {
   const [query, setQuery] = useState("");
-  const [method, setMethod] = useState("prf+bert");
+  const [method, setMethod] = useState("bert");
   const [topK, setTopK] = useState(10);
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);
@@ -176,7 +182,7 @@ export default function App() {
               <li key={r.id} className="card">
                 <div className="card-head">
                   <span className="rank">#{r.rank}</span>
-                  <a href={r.link} target="_blank" rel="noreferrer" className="headline">
+                  <a href={safeUrl(r.link)} target="_blank" rel="noreferrer" className="headline">
                     {r.headline}
                   </a>
                 </div>

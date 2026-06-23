@@ -21,7 +21,7 @@ Two retrieval modes:
 from __future__ import annotations
 
 import math
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from .index import InvertedIndex
 
@@ -42,7 +42,7 @@ def _candidate_docs(terms: Iterable[str], index: InvertedIndex, mode: str) -> Se
 def score(
     query_terms: List[str],
     index: InvertedIndex,
-    top_k: int = 10,
+    top_k: Optional[int] = 10,
     mode: str = "or",
     restrict_to: Set[int] | None = None,
 ) -> List[Tuple[int, float]]:
@@ -51,9 +51,10 @@ def score(
     Args:
         query_terms: already-preprocessed (stemmed) query tokens.
         index: the inverted index.
-        top_k: number of results to return.
+        top_k: number of results to return; ``None`` returns every scored doc.
         mode: ``"or"`` or ``"and"`` candidate selection.
-        restrict_to: optional set of doc_ids to score within (used for re-ranking).
+        restrict_to: optional set of doc_ids to score within (used for re-ranking
+            and category filtering).
     """
     if not query_terms:
         return []
@@ -86,7 +87,7 @@ def score(
 def bm25(
     query_terms: List[str],
     index: InvertedIndex,
-    top_k: int = 10,
+    top_k: Optional[int] = 10,
     mode: str = "or",
     restrict_to: Set[int] | None = None,
     k1: float = 1.5,
@@ -95,7 +96,8 @@ def bm25(
     """Rank documents for ``query_terms`` with Okapi BM25.
 
     ``k1`` controls term-frequency saturation; ``b`` controls how strongly
-    document length is normalised (0 = none, 1 = full).
+    document length is normalised (0 = none, 1 = full). ``top_k=None`` returns
+    every scored document (used to compute an honest total hit count).
     """
     if not query_terms:
         return []

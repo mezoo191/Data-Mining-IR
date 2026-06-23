@@ -116,11 +116,20 @@ The interactive API docs live at `http://localhost:8000/docs`.
 ### Using the full dataset
 
 ```bash
-python scripts/download_data.py                                   # fetch from Kaggle
+python scripts/download_data.py                                   # public mirror, no login
 python scripts/build_index.py --data data/News_Category_Dataset_v3.json
 # optional: add semantic expansion
 pip install -r requirements-bert.txt
 python scripts/build_index.py --data data/News_Category_Dataset_v3.json --bert
+```
+
+### Offline evaluation
+
+Compare methods with Precision@K / Recall / F1 / latency (pseudo-qrels from the
+dataset's category labels):
+
+```bash
+python scripts/evaluate.py                 # uses artifacts/index.pkl, or the sample
 ```
 
 ### Single-service deployment
@@ -176,7 +185,7 @@ news-search-engine/
 │   └── evaluate.py       # P@K · Recall · F1
 ├── api/main.py           # FastAPI app
 ├── frontend/             # React + Vite UI
-├── scripts/              # download_data.py · build_index.py
+├── scripts/              # download_data.py · build_index.py · evaluate.py
 ├── notebooks/demo.ipynb  # end-to-end walkthrough
 ├── tests/                # pytest suite
 └── data/                 # sample_news.jsonl (committed)
