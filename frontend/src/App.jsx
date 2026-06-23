@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 
 const METHODS = [
-  { id: "bert", label: "BERT", hint: "Dense semantic retrieval (default)", semantic: true },
-  { id: "hybrid", label: "Hybrid", hint: "BM25 + BERT fusion", semantic: true },
+  { id: "hybrid", label: "Hybrid", hint: "BM25 + BERT fusion (default)", semantic: true },
+  { id: "bert", label: "BERT", hint: "Dense semantic retrieval", semantic: true },
   { id: "bm25", label: "BM25", hint: "Modern lexical ranking" },
   { id: "tfidf", label: "TF-IDF", hint: "Classic ranking, for comparison" },
   { id: "prf", label: "Relevance Feedback", hint: "Mark results relevant, then refine" },
@@ -25,7 +25,7 @@ const EXAMPLES = [
 
 export default function App() {
   const [query, setQuery] = useState("");
-  const [method, setMethod] = useState("bert");
+  const [method, setMethod] = useState("hybrid");
   const [topK, setTopK] = useState(10);
   const [category, setCategory] = useState("");
   const [categories, setCategories] = useState([]);

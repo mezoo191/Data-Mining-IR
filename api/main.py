@@ -125,7 +125,7 @@ def categories():
 @app.get("/api/search")
 def search(
     q: str = Query(..., min_length=1, max_length=512, description="Search query"),
-    method: Optional[str] = Query(None, description=f"One of {METHODS}; defaults to BERT"),
+    method: Optional[str] = Query(None, description=f"One of {METHODS}; defaults to Hybrid"),
     top_k: int = Query(10, ge=1, le=50),
     category: Optional[str] = Query(None, max_length=100),
     relevant_ids: Optional[List[int]] = Query(
@@ -133,10 +133,10 @@ def search(
     ),
 ):
     engine = _engine()
-    # Default to BERT (the best method) when it's available, else BM25 so a bare
-    # request never fails on a lite (no-BERT) deployment.
+    # Default to Hybrid (BM25 + BERT fusion) when embeddings are available, else
+    # BM25 so a bare request never fails on a lite (no-BERT) deployment.
     if method is None:
-        method = "bert" if engine.dense is not None else "bm25"
+        method = "hybrid" if engine.dense is not None else "bm25"
     if method not in METHODS:
         raise HTTPException(400, f"Unknown method '{method}'. Choose from {list(METHODS)}.")
     if method in ("bert", "hybrid") and engine.dense is None:

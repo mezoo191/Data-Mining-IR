@@ -92,9 +92,19 @@ if not "!SIG!"=="!PREVSIG!" (
 
 REM --- 6. Build the search index (only if missing) ----------
 if "%USE_BERT%"=="1" (
+  REM Try a prebuilt dense model first (full dataset only); falls back to building.
+  if not exist artifacts\dense.pkl if "%USE_FULL%"=="1" (
+    echo [setup] Looking for a prebuilt dense model ^(MODEL_URL^)...
+    python scripts\download_model.py
+  )
   if not exist artifacts\dense.pkl (
     echo [setup] Building index + dense BERT embeddings...
     python scripts\build_index.py !DATA_ARG! --bert || goto :error
+  ) else (
+    if not exist artifacts\index.pkl (
+      echo [setup] Building search index to match the prebuilt model...
+      python scripts\build_index.py !DATA_ARG! || goto :error
+    )
   )
   if not exist artifacts\dense.pkl (
     echo [error] Dense BERT embeddings were not created. Check the build output above.

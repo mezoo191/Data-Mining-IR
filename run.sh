@@ -89,9 +89,17 @@ fi
 
 # --- 6. Build the search index (only if missing) ------------
 if [ "$USE_BERT" = "1" ]; then
+  # Try a prebuilt dense model first (full dataset only); falls back to building.
+  if [ ! -f artifacts/dense.pkl ] && [ "$USE_FULL" = "1" ]; then
+    echo "[setup] Looking for a prebuilt dense model (MODEL_URL)..."
+    python scripts/download_model.py || true
+  fi
   if [ ! -f artifacts/dense.pkl ]; then
     echo "[setup] Building index + dense BERT embeddings..."
     python scripts/build_index.py $DATA_ARG --bert
+  elif [ ! -f artifacts/index.pkl ]; then
+    echo "[setup] Building search index to match the prebuilt model..."
+    python scripts/build_index.py $DATA_ARG
   fi
   [ -f artifacts/dense.pkl ] || { echo "[error] Dense BERT embeddings were not created."; exit 1; }
 else

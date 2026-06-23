@@ -37,10 +37,22 @@ class DenseRetriever:
         self.__dict__.update(state)
         self._model = None
 
+    @staticmethod
+    def _best_device() -> str:
+        """Use a CUDA GPU when available, else CPU. (Requires a CUDA build of
+        PyTorch; a CPU-only install always reports 'cpu'.)"""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return "cuda"
+        except Exception:
+            pass
+        return "cpu"
+
     def _ensure_model(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self.model_name)
+            self._model = SentenceTransformer(self.model_name, device=self._best_device())
         return self._model
 
     def fit(self, docs: List[Document], verbose: bool = True, batch_size: int = 256) -> "DenseRetriever":
@@ -48,6 +60,8 @@ class DenseRetriever:
         import numpy as np
 
         model = self._ensure_model()
+        if verbose:
+            print(f"Encoding on device: {self._best_device()}")
         self.doc_ids = [d.id for d in docs]
         texts = [d.text for d in docs]
         if verbose:
