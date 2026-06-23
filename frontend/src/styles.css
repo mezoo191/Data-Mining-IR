@@ -230,6 +230,50 @@ body {
 .date { color: var(--muted); }
 .score { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
 
+/* Relevance feedback */
+.fb-hint {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.feedback-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 16px;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--muted);
+}
+.feedback-bar button {
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.feedback-bar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.relevant-check {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.card.marked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
 .foot {
   /* Push to the bottom of the page; keeps spacing from content when the page
      is long, but pins to the viewport bottom when content is short. */

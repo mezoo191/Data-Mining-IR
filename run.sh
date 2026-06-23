@@ -79,21 +79,21 @@ fi
 
 # --- 5. Rebuild the index when the mode/dataset changes -----
 SIG="sample"; [ "$USE_FULL" = "1" ] && SIG="full"
-[ "$USE_BERT" = "1" ] && SIG="${SIG}+bert"
+[ "$USE_BERT" = "1" ] && SIG="${SIG}+dense"
 PREVSIG=""
 [ -f artifacts/build.info ] && PREVSIG="$(cat artifacts/build.info)"
 if [ "$SIG" != "$PREVSIG" ]; then
   [ -n "$PREVSIG" ] && echo "[setup] Build config changed ($PREVSIG -> $SIG); rebuilding..."
-  rm -f artifacts/index.pkl artifacts/bert.pkl
+  rm -f artifacts/index.pkl artifacts/dense.pkl artifacts/bert.pkl
 fi
 
 # --- 6. Build the search index (only if missing) ------------
 if [ "$USE_BERT" = "1" ]; then
-  if [ ! -f artifacts/bert.pkl ]; then
-    echo "[setup] Building index + BERT embeddings..."
+  if [ ! -f artifacts/dense.pkl ]; then
+    echo "[setup] Building index + dense BERT embeddings..."
     python scripts/build_index.py $DATA_ARG --bert
   fi
-  [ -f artifacts/bert.pkl ] || { echo "[error] BERT embeddings were not created."; exit 1; }
+  [ -f artifacts/dense.pkl ] || { echo "[error] Dense BERT embeddings were not created."; exit 1; }
 else
   if [ ! -f artifacts/index.pkl ]; then
     echo "[setup] Building search index..."

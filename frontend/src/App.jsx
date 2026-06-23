@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 
 const METHODS = [
-  { id: "bm25", label: "BM25", hint: "Modern ranking" },
+  { id: "bert", label: "BERT", hint: "Dense semantic retrieval (default)", semantic: true },
+  { id: "hybrid", label: "Hybrid", hint: "BM25 + BERT fusion", semantic: true },
+  { id: "bm25", label: "BM25", hint: "Modern lexical ranking" },
   { id: "tfidf", label: "TF-IDF", hint: "Classic ranking, for comparison" },
-  { id: "prf", label: "Relevance Feedback", hint: "BM25 + pseudo-relevance feedback" },
+  { id: "prf", label: "Relevance Feedback", hint: "Mark results relevant, then refine" },
   { id: "wordnet", label: "WordNet", hint: "BM25 + synonym expansion" },
-  { id: "bert", label: "BERT", hint: "BM25 + semantic embeddings (default)" },
-  { id: "prf+bert", label: "PRF + BERT", hint: "BM25 + hybrid expansion" },
 ];
 
 // Only allow http(s) links through to href; guards against javascript:/data:
@@ -33,13 +33,15 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Doc ids the user marked relevant (for true relevance feedback on "prf").
+  const [relevantIds, setRelevantIds] = useState(() => new Set());
 
   useEffect(() => {
     fetch("/api/health")
       .then((r) => r.json())
       .then((d) => {
         setHealth(d);
-        // Fall back to BM25 if BERT wasn't built (e.g. `run.bat lite`).
+        // Fall back to BM25 if BERT embeddings weren't built (e.g. `run.bat lite`).
         if (!d.bert_available) setMethod("bm25");
       })
       .catch(() => {});
@@ -49,13 +51,19 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  async function runSearch(q = query) {
+  // withFeedback=true reuses the marked-relevant docs (the "Refine" action);
+  // a fresh search clears them.
+  async function runSearch(q = query, withFeedback = false) {
     if (!q.trim()) return;
+    if (!withFeedback) setRelevantIds(new Set());
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ q, method, top_k: topK });
       if (category) params.set("category", category);
+      if (method === "prf" && withFeedback) {
+        for (const id of relevantIds) params.append("relevant_ids", id);
+      }
       const res = await fetch(`/api/search?${params}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -70,7 +78,16 @@ export default function App() {
     }
   }
 
+  function toggleRelevant(id) {
+    setRelevantIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
   const bertDisabled = health && !health.bert_available;
+  const feedbackMode = method === "prf";
 
   return (
     <div className="app">
@@ -79,7 +96,7 @@ export default function App() {
           <span className="logo">◆</span> News Search Engine
         </h1>
         <p className="subtitle">
-          TF-IDF information retrieval with query expansion
+          Lexical (BM25/TF-IDF) &amp; semantic (BERT) retrieval with query expansion
           {health && (
             <span className="stats">
               {" "}· {health.documents.toLocaleString()} docs ·{" "}
@@ -115,7 +132,7 @@ export default function App() {
         <div className="controls">
           <div className="methods">
             {METHODS.map((m) => {
-              const disabled = (m.id === "bert" || m.id === "prf+bert") && bertDisabled;
+              const disabled = m.semantic && bertDisabled;
               return (
                 <button
                   key={m.id}
@@ -150,6 +167,12 @@ export default function App() {
             </label>
           </div>
         </div>
+
+        {feedbackMode && (
+          <p className="fb-hint">
+            Relevance feedback: tick the results that match what you want, then refine the search.
+          </p>
+        )}
       </section>
 
       {error && <div className="error">⚠ {error}</div>}
@@ -173,14 +196,35 @@ export default function App() {
             </div>
           )}
 
+          {feedbackMode && data.results.length > 0 && (
+            <div className="feedback-bar">
+              <span>{relevantIds.size} marked relevant</span>
+              <button
+                onClick={() => runSearch(query, true)}
+                disabled={loading || relevantIds.size === 0}
+              >
+                Refine with feedback
+              </button>
+            </div>
+          )}
+
           {data.results.length === 0 && (
             <div className="empty">No documents matched this query.</div>
           )}
 
           <ol className="cards">
             {data.results.map((r) => (
-              <li key={r.id} className="card">
+              <li key={r.id} className={`card ${relevantIds.has(r.id) ? "marked" : ""}`}>
                 <div className="card-head">
+                  {feedbackMode && (
+                    <input
+                      type="checkbox"
+                      className="relevant-check"
+                      title="Mark relevant"
+                      checked={relevantIds.has(r.id)}
+                      onChange={() => toggleRelevant(r.id)}
+                    />
+                  )}
                   <span className="rank">#{r.rank}</span>
                   <a href={safeUrl(r.link)} target="_blank" rel="noreferrer" className="headline">
                     {r.headline}
@@ -199,7 +243,8 @@ export default function App() {
       )}
 
       <footer className="foot">
-        Built with FastAPI + React · inverted index, BM25 &amp; TF-IDF ranking, PRF / WordNet / BERT expansion
+        Built with FastAPI + React · inverted index, BM25 &amp; TF-IDF ranking, dense BERT
+        retrieval, PRF / WordNet expansion &amp; relevance feedback
       </footer>
     </div>
   );

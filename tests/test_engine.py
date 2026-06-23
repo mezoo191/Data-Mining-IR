@@ -120,17 +120,70 @@ def test_ranking_restrict_to_limits_candidates(engine):
     assert {doc_id for doc_id, _ in res}.issubset(allowed)
 
 
-def test_bert_method_without_bert_is_graceful(engine):
-    # engine.bert is None -> bert expansion contributes nothing but must not error
+def test_bert_method_without_dense_falls_back_gracefully(engine):
+    # engine.dense is None -> semantic methods fall back to lexical, no error
     res = engine.search("health", method="bert", top_k=5)
     assert res.method == "bert"
-    assert res.expansion_terms == []
+    assert isinstance(res.results, list)
 
 
-def test_prf_bert_without_bert_still_uses_prf(engine):
-    res = engine.search("health", method="prf+bert", top_k=5)
-    assert res.method == "prf+bert"
-    assert isinstance(res.expansion_terms, list)  # PRF terms only (no bert)
+def test_hybrid_method_without_dense_falls_back_gracefully(engine):
+    res = engine.search("health", method="hybrid", top_k=5)
+    assert res.method == "hybrid"
+    assert isinstance(res.results, list)
+
+
+def test_prf_relevance_feedback_uses_marked_docs(engine):
+    from news_search import expansion
+    rel = list(engine.index.meta)[:2]
+    fb_terms = expansion.prf_terms(["news"], engine.index, relevant_ids=rel)
+    # every feedback term must come from the documents the user marked relevant
+    union = set()
+    for doc_id in rel:
+        union |= set(engine.index.forward[doc_id])
+    assert fb_terms  # the marked docs contribute some terms
+    assert all(t in union for t in fb_terms)
+
+
+def test_prf_search_accepts_relevant_ids(engine):
+    rel = list(engine.index.meta)[:3]
+    res = engine.search("health", method="prf", top_k=10, relevant_ids=rel)
+    assert res.method == "prf"
+    assert isinstance(res.expansion_terms, list)
+
+
+# --- dense / semantic retrieval (needs sentence-transformers) --------------- #
+_SEMANTIC_DOCS = [
+    Document(id=0, text="the president won the national election", headline="Election",
+             short_description="", category="POLITICS", date="", link="https://example.com"),
+    Document(id=1, text="the striker scored a goal in the football match", headline="Football",
+             short_description="", category="SPORTS", date="", link="https://example.com"),
+    Document(id=2, text="a new vaccine lowers the risk of disease", headline="Vaccine",
+             short_description="", category="HEALTH", date="", link="https://example.com"),
+]
+
+
+def test_dense_retriever_matches_by_meaning():
+    pytest.importorskip("sentence_transformers")
+    from news_search.dense import DenseRetriever
+    dr = DenseRetriever().fit(_SEMANTIC_DOCS, verbose=False)
+    top = dr.search("soccer match result", top_k=1)  # no shared keywords with the doc
+    assert top and top[0][0] == 1  # the football doc wins on meaning
+
+
+def test_engine_bert_and_hybrid_with_dense():
+    pytest.importorskip("sentence_transformers")
+    from news_search.dense import DenseRetriever
+    idx = build_index(_SEMANTIC_DOCS, verbose=False)
+    eng = SearchEngine(idx, dense=DenseRetriever().fit(_SEMANTIC_DOCS, verbose=False))
+
+    res = eng.search("soccer match result", method="bert", top_k=1)
+    assert res.method == "bert"
+    assert res.results and res.results[0]["id"] == 1
+
+    res_h = eng.search("soccer match result", method="hybrid", top_k=3)
+    assert res_h.method == "hybrid"
+    assert len(res_h.results) >= 1
 
 
 def test_prf_adds_expansion_terms(engine):

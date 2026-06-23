@@ -2,7 +2,7 @@
 
 We point INDEX_PATH at a non-existent file *before* importing the app so the
 engine is built from the committed sample (fast, deterministic) and BERT is
-disabled (no bert.pkl next to that path).
+disabled (no dense.pkl next to that path).
 """
 import os
 import sys

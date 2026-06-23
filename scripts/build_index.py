@@ -8,7 +8,7 @@ Usage
     # Build from the full dataset
     python scripts/build_index.py --data data/News_Category_Dataset_v3.json
 
-    # Also precompute BERT vocabulary embeddings (heavy, optional)
+    # Also build dense BERT document embeddings (heavy, optional)
     python scripts/build_index.py --data data/News_Category_Dataset_v3.json --bert
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from news_search import build_index, load_corpus  # noqa: E402
-from news_search.expansion import BertExpander  # noqa: E402
+from news_search.dense import DenseRetriever  # noqa: E402
 
 
 def main() -> int:
@@ -33,7 +33,7 @@ def main() -> int:
                     help="Where to write the pickled index.")
     ap.add_argument("--limit", type=int, default=None, help="Cap number of documents.")
     ap.add_argument("--bert", action="store_true",
-                    help="Also build BERT vocab embeddings (saved next to index).")
+                    help="Also build dense BERT document embeddings (saved as dense.pkl).")
     args = ap.parse_args()
 
     print(f"Loading corpus from {args.data} ...")
@@ -45,11 +45,11 @@ def main() -> int:
     print(f"Saved index -> {args.out}")
 
     if args.bert:
-        bert = BertExpander().fit(index)
-        bert_path = Path(args.out).with_name("bert.pkl")
-        with bert_path.open("wb") as fh:
-            pickle.dump(bert, fh, protocol=pickle.HIGHEST_PROTOCOL)
-        print(f"Saved BERT expander -> {bert_path}")
+        dense = DenseRetriever().fit(docs)
+        dense_path = Path(args.out).with_name("dense.pkl")
+        with dense_path.open("wb") as fh:
+            pickle.dump(dense, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        print(f"Saved dense retriever -> {dense_path}")
 
     return 0
 

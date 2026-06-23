@@ -12,6 +12,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import pickle
 import sys
 from pathlib import Path
 
@@ -21,6 +22,22 @@ sys.path.insert(0, str(ROOT / "src"))
 from news_search import SearchEngine, build_index, load_corpus  # noqa: E402
 from news_search.index import InvertedIndex  # noqa: E402
 from news_search.evaluate import evaluate  # noqa: E402
+
+ALL_METHODS = ["bm25", "tfidf", "prf", "wordnet", "bert", "hybrid"]
+BASE_METHODS = ["bm25", "tfidf", "prf", "wordnet"]
+
+
+def _load_dense(index_path: Path):
+    """Load the dense (BERT) retriever sitting next to the index, if present."""
+    dense_path = Path(index_path).with_name("dense.pkl")
+    if not dense_path.exists():
+        return None
+    try:
+        with dense_path.open("rb") as fh:
+            return pickle.load(fh)
+    except Exception as exc:  # pragma: no cover
+        print(f"[warn] could not load {dense_path}: {exc}")
+        return None
 
 DEFAULT_QUERIES = [
     "covid vaccine health",
@@ -45,12 +62,22 @@ def main() -> int:
 
     if Path(args.index).exists():
         print(f"Loading index from {args.index}")
-        engine = SearchEngine(InvertedIndex.load(args.index))
+        engine = SearchEngine(InvertedIndex.load(args.index), dense=_load_dense(Path(args.index)))
     else:
         print(f"No index at {args.index}; building from {args.data}")
         engine = SearchEngine(build_index(load_corpus(args.data), verbose=False))
 
-    rows = evaluate(engine, DEFAULT_QUERIES, methods=args.methods, top_k=args.top_k)
+    # Evaluate BERT methods too when embeddings are available.
+    methods = args.methods or (ALL_METHODS if engine.dense is not None else BASE_METHODS)
+    print(f"Index: {engine.index.num_docs:,} docs | "
+          f"BERT {'enabled' if engine.dense is not None else 'disabled'} | methods: {methods}")
+
+    # Warm up the BERT model so its one-time load isn't charged to the first
+    # timed query (gives a fair steady-state latency).
+    if engine.dense is not None:
+        engine.search("warmup query", method="bert", top_k=1)
+
+    rows = evaluate(engine, DEFAULT_QUERIES, methods=methods, top_k=args.top_k)
 
     print(f"\n{'method':<12}{'P@K':>8}{'Recall':>9}{'F1':>8}{'avg ms':>9}")
     print("-" * 46)

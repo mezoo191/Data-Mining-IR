@@ -1,18 +1,20 @@
 """Query-expansion strategies.
 
-Three independent techniques, all returning *stemmed* expansion tokens that can
-be appended to the original query before re-ranking:
+Both techniques return *stemmed* expansion tokens to append to the original
+query before re-ranking:
 
-1. Pseudo-Relevance Feedback (PRF) — Rocchio-style: assume the top results are
-   relevant and pull the most discriminative (TF-IDF) terms from them.
+1. Relevance Feedback (Rocchio-style) — pull the most discriminative (TF-IDF)
+   terms from a set of "relevant" documents. By default the set is the top
+   retrieved docs (*pseudo*-relevance feedback); pass ``relevant_ids`` to use
+   documents the user explicitly marked relevant (*true* relevance feedback).
 2. WordNet synonyms — lexical expansion from the WordNet thesaurus.
-3. BERT embeddings — semantic expansion using sentence-transformer similarity
-   over the index vocabulary. Loaded lazily (heavy dependency).
+
+(Semantic / BERT retrieval lives in :mod:`news_search.dense`.)
 """
 from __future__ import annotations
 
 from collections import Counter
-from typing import List, Tuple
+from typing import List, Optional
 
 from .index import InvertedIndex
 from .preprocess import Preprocessor
@@ -20,22 +22,32 @@ from . import ranking
 
 
 # --------------------------------------------------------------------------- #
-# 1. Pseudo-Relevance Feedback
+# 1. Relevance Feedback (pseudo by default, true when relevant_ids given)
 # --------------------------------------------------------------------------- #
 def prf_terms(
     query_terms: List[str],
     index: InvertedIndex,
     top_k_feedback: int = 10,
     top_terms: int = 5,
+    relevant_ids: Optional[List[int]] = None,
 ) -> List[str]:
-    """Extract expansion terms from the top retrieved documents (PRF)."""
-    initial = ranking.bm25(query_terms, index, top_k=top_k_feedback, mode="or")
-    if not initial:
+    """Extract expansion terms from a set of relevant documents (Rocchio).
+
+    If ``relevant_ids`` is provided, those user-judged documents are the feedback
+    set (true relevance feedback). Otherwise the top ``top_k_feedback`` BM25 hits
+    are assumed relevant (pseudo-relevance feedback).
+    """
+    if relevant_ids:
+        feedback_docs = [d for d in relevant_ids if d in index.forward]
+    else:
+        feedback_docs = [d for d, _ in ranking.bm25(query_terms, index,
+                                                     top_k=top_k_feedback, mode="or")]
+    if not feedback_docs:
         return []
 
     qset = set(query_terms)
     term_scores: Counter = Counter()
-    for doc_id, _ in initial:
+    for doc_id in feedback_docs:
         forward = index.forward.get(doc_id, {})
         dl = index.doc_len.get(doc_id, 0) or 1
         for term, freq in forward.items():
@@ -80,71 +92,3 @@ def wordnet_terms(
                 if per_token >= max_per_term:  # cap synonyms *per query term*
                     break
     return added
-
-
-# --------------------------------------------------------------------------- #
-# 3. BERT embedding expansion (lazy, optional)
-# --------------------------------------------------------------------------- #
-class BertExpander:
-    """Semantic query expansion via sentence-transformer embeddings.
-
-    Embeds the most frequent vocabulary terms once, then finds terms whose
-    embeddings are most similar to the query embedding.
-    """
-
-    def __init__(self, model_name: str = "all-MiniLM-L6-v2", vocab_size: int = 15000):
-        self.model_name = model_name
-        self.vocab_size = vocab_size
-        self._model = None
-        self._vocab: List[str] = []
-        self._embeddings = None
-
-    # Persist only the lightweight data (vocab + numpy embeddings), never the
-    # live sentence-transformer model — pickling a torch model is fragile and
-    # version-sensitive. The model is re-created lazily on first use.
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        state["_model"] = None
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self._model = None
-
-    def _ensure_model(self):
-        if self._model is None:
-            from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self.model_name)
-        return self._model
-
-    def fit(self, index: InvertedIndex, verbose: bool = True) -> "BertExpander":
-        """Compute embeddings for the most frequent vocabulary terms."""
-        model = self._ensure_model()
-        terms = sorted(index.postings, key=lambda t: index.df(t), reverse=True)
-        self._vocab = terms[: self.vocab_size]
-        if verbose:
-            print(f"Embedding {len(self._vocab):,} vocabulary terms with {self.model_name}...")
-        self._embeddings = model.encode(
-            self._vocab, batch_size=256, show_progress_bar=verbose, normalize_embeddings=True
-        )
-        return self
-
-    def expand(self, query: str, query_terms: List[str], top_n: int = 5) -> List[Tuple[str, float]]:
-        if self._embeddings is None:
-            raise RuntimeError("BertExpander.fit() must be called before expand().")
-        import numpy as np
-
-        model = self._ensure_model()
-        q_emb = model.encode([query], normalize_embeddings=True)[0]
-        sims = self._embeddings @ q_emb  # cosine sim (vectors are normalized)
-        order = np.argsort(sims)[::-1]
-
-        qset = set(query_terms)
-        out: List[Tuple[str, float]] = []
-        for idx in order:
-            term = self._vocab[idx]
-            if term not in qset and len(term) > 2:
-                out.append((term, float(sims[idx])))
-            if len(out) >= top_n:
-                break
-        return out

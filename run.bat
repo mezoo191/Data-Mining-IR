@@ -80,23 +80,24 @@ if "%USE_FULL%"=="1" (
 REM --- 5. Rebuild the index when the mode/dataset changes ----
 set SIG=sample
 if "%USE_FULL%"=="1" set SIG=full
-if "%USE_BERT%"=="1" set SIG=!SIG!+bert
+if "%USE_BERT%"=="1" set SIG=!SIG!+dense
 set PREVSIG=
 if exist artifacts\build.info set /p PREVSIG=<artifacts\build.info
 if not "!SIG!"=="!PREVSIG!" (
   if not "!PREVSIG!"=="" echo [setup] Build config changed ^("!PREVSIG!" -^> "!SIG!"^); rebuilding...
   if exist artifacts\index.pkl del /q artifacts\index.pkl
+  if exist artifacts\dense.pkl del /q artifacts\dense.pkl
   if exist artifacts\bert.pkl del /q artifacts\bert.pkl
 )
 
 REM --- 6. Build the search index (only if missing) ----------
 if "%USE_BERT%"=="1" (
-  if not exist artifacts\bert.pkl (
-    echo [setup] Building index + BERT embeddings...
+  if not exist artifacts\dense.pkl (
+    echo [setup] Building index + dense BERT embeddings...
     python scripts\build_index.py !DATA_ARG! --bert || goto :error
   )
-  if not exist artifacts\bert.pkl (
-    echo [error] BERT embeddings were not created. Check the build output above.
+  if not exist artifacts\dense.pkl (
+    echo [error] Dense BERT embeddings were not created. Check the build output above.
     goto :error
   )
 ) else (
