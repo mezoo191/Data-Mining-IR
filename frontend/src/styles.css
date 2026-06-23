@@ -25,6 +25,10 @@ body {
   max-width: 860px;
   margin: 0 auto;
   padding: 48px 20px 80px;
+  /* Sticky footer: fill at least the viewport so .foot can sit at the bottom. */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Hero */
@@ -227,7 +231,10 @@ body {
 .score { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
 
 .foot {
-  margin-top: 48px;
+  /* Push to the bottom of the page; keeps spacing from content when the page
+     is long, but pins to the viewport bottom when content is short. */
+  margin-top: auto;
+  padding-top: 48px;
   text-align: center;
   color: var(--muted);
   font-size: 12px;

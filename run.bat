@@ -3,28 +3,27 @@ REM ============================================================
 REM  News Search Engine - one-shot setup + launch (Windows)
 REM
 REM  Usage:
-REM    run.bat            Sample dataset WITH BERT (best for a quick demo)
+REM    run.bat            BEST MODE (default): sample dataset WITH BERT
 REM    run.bat lite       Sample dataset, no BERT (fastest)
-REM    run.bat full       Full ~210k dataset, no BERT (recommended for scale)
-REM    run.bat full bert  Full dataset WITH BERT (slow: embeds ~60k terms)
+REM    run.bat full       Full ~210k dataset WITH BERT (best at scale, slow build)
+REM    run.bat full lite  Full dataset, no BERT
 REM
+REM  Best mode (BERT) is always the default. Pass "lite" (or "nobert") to opt out.
 REM  The browser opens automatically once the server is ready.
 REM ============================================================
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
-REM BERT defaults ON for the sample, but OFF for the full dataset (too slow to
-REM embed ~60k terms on a laptop) unless you explicitly pass "bert".
+REM Best mode = BERT enabled. It stays ON by default and is only turned off when
+REM the user explicitly opts out with "lite" / "nobert".
 set USE_BERT=1
 set USE_FULL=0
-set BERT_EXPLICIT=0
 for %%A in (%*) do (
   if /I "%%A"=="lite" set USE_BERT=0
   if /I "%%A"=="nobert" set USE_BERT=0
-  if /I "%%A"=="bert" ( set USE_BERT=1 & set BERT_EXPLICIT=1 )
+  if /I "%%A"=="bert" set USE_BERT=1
   if /I "%%A"=="full" set USE_FULL=1
 )
-if "%USE_FULL%"=="1" if "%BERT_EXPLICIT%"=="0" set USE_BERT=0
 
 REM --- 0. Prerequisites --------------------------------------
 where python >nul 2>nul || (echo [error] Python not found. Install Python 3.9+ from python.org & goto :error)
@@ -36,7 +35,9 @@ if errorlevel 1 (
 )
 
 REM --- 1. Stop any previous server still holding port 8000 ---
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8000" ^| findstr LISTENING') do (
+REM Match the local listening socket precisely (":8000 " with a trailing space)
+REM so we don't kill unrelated ports like :58000 or remote :8000 connections.
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":8000 " ^| findstr LISTENING') do (
   echo [setup] Stopping previous server on port 8000 ^(PID %%P^)...
   taskkill /F /PID %%P >nul 2>nul
 )
@@ -64,7 +65,12 @@ if "%USE_FULL%"=="1" (
   if exist data\News_Category_Dataset_v3.json set DATASET=data\News_Category_Dataset_v3.json
   if exist News_Category_Dataset_v3.json set DATASET=News_Category_Dataset_v3.json
   if "!DATASET!"=="" (
-    echo [error] Full dataset not found. Run: python scripts\download_data.py
+    echo [setup] Full dataset not found - downloading automatically...
+    python scripts\download_data.py || goto :error
+    if exist data\News_Category_Dataset_v3.json set DATASET=data\News_Category_Dataset_v3.json
+  )
+  if "!DATASET!"=="" (
+    echo [error] Full dataset still missing after download.
     goto :error
   )
   echo [setup] Using full dataset: !DATASET!

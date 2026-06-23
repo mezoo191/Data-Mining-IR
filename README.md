@@ -76,20 +76,21 @@ builds the index, builds the UI, and launches the app at
 `http://localhost:8000`:
 
 ```bash
-run.bat            # Windows  (sample dataset + BERT — best quick demo)
+run.bat            # Windows  — BEST MODE (default): sample dataset + BERT
 ./run.sh           # macOS / Linux
 
 run.bat lite       # sample dataset, no BERT (fastest)
-run.bat full       # full ~210k-article dataset, no BERT (download it first)
-run.bat full bert  # full dataset + BERT (slow: embeds ~60k terms)
+run.bat full       # full ~210k-article dataset + BERT (download it first; slow build)
+run.bat full lite  # full dataset, no BERT
 ```
 
 > Requires Python 3.9+ and Node.js. The browser opens automatically once the
-> server is ready. BERT is on by default for the sample (a large one-time
-> PyTorch download) but **off for the full dataset**, where embedding the whole
-> vocabulary is impractical on a laptop. Switching modes automatically rebuilds
-> the index, and the terminal prints what loaded, e.g.
-> `Ready: 209,527 documents | 62,090 terms | BERT disabled`.
+> server is ready. **Best mode (BERT) is always the default** — pass `lite` (or
+> `nobert`) to opt out. BERT is a large one-time PyTorch download; on the full
+> dataset, building embeddings for the whole ~60k-term vocabulary is slow, so
+> use `full lite` if you only need the full corpus without semantic expansion.
+> Switching modes automatically rebuilds the index, and the terminal prints what
+> loaded, e.g. `Ready: 209,527 documents | 62,090 terms | BERT ENABLED`.
 
 <details>
 <summary>Manual steps (if you prefer)</summary>

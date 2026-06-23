@@ -3,28 +3,27 @@
 #  News Search Engine - one-shot setup + launch (macOS/Linux)
 #
 #  Usage:
-#    ./run.sh            Sample dataset WITH BERT (best for a quick demo)
+#    ./run.sh            BEST MODE (default): sample dataset WITH BERT
 #    ./run.sh lite       Sample dataset, no BERT (fastest)
-#    ./run.sh full       Full ~210k dataset, no BERT (recommended for scale)
-#    ./run.sh full bert  Full dataset WITH BERT (slow: embeds ~60k terms)
+#    ./run.sh full       Full ~210k dataset WITH BERT (best at scale, slow build)
+#    ./run.sh full lite  Full dataset, no BERT
 #
+#  Best mode (BERT) is always the default. Pass "lite" (or "nobert") to opt out.
 #  The browser opens automatically once the server is ready.
 # ============================================================
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# BERT defaults ON for the sample, but OFF for the full dataset (too slow to
-# embed ~60k terms on a laptop) unless you explicitly pass "bert".
+# Best mode = BERT enabled. It stays ON by default and is only turned off when
+# the user explicitly opts out with "lite" / "nobert".
 USE_BERT=1
 USE_FULL=0
-BERT_EXPLICIT=0
 for arg in "$@"; do
   [ "$arg" = "lite" ] && USE_BERT=0
   [ "$arg" = "nobert" ] && USE_BERT=0
-  [ "$arg" = "bert" ] && { USE_BERT=1; BERT_EXPLICIT=1; }
+  [ "$arg" = "bert" ] && USE_BERT=1
   [ "$arg" = "full" ] && USE_FULL=1
 done
-[ "$USE_FULL" = "1" ] && [ "$BERT_EXPLICIT" = "0" ] && USE_BERT=0
 
 # --- 0. Prerequisites ---------------------------------------
 command -v python3 >/dev/null 2>&1 || { echo "[error] Python 3 not found."; exit 1; }
@@ -66,7 +65,12 @@ if [ "$USE_FULL" = "1" ]; then
   [ -f data/News_Category_Dataset_v3.json ] && DATASET="data/News_Category_Dataset_v3.json"
   [ -f News_Category_Dataset_v3.json ] && DATASET="News_Category_Dataset_v3.json"
   if [ -z "$DATASET" ]; then
-    echo "[error] Full dataset not found. Run: python scripts/download_data.py"
+    echo "[setup] Full dataset not found - downloading automatically..."
+    python scripts/download_data.py
+    [ -f data/News_Category_Dataset_v3.json ] && DATASET="data/News_Category_Dataset_v3.json"
+  fi
+  if [ -z "$DATASET" ]; then
+    echo "[error] Full dataset still missing after download."
     exit 1
   fi
   echo "[setup] Using full dataset: $DATASET"
