@@ -284,7 +284,31 @@ body {
   font-size: 12px;
 }
 
-@media (max-width: 600px) {
+/* ---- Mobile ---- */
+@media (max-width: 640px) {
+  .app { padding: 28px 16px 56px; }
+  .hero { margin-bottom: 22px; }
+  .hero h1 { font-size: 27px; }
+  .subtitle { font-size: 14px; }
+  .searchbar { padding: 14px; }
+
+  /* stack methods over the filters, and let filters fill the width */
   .controls { flex-direction: column; }
+  .filters { width: 100%; }
+  .filters label { flex: 1; }
+  .filters select { width: 100%; }
+
+  /* wrap instead of overflowing on narrow screens */
+  .results-meta { flex-wrap: wrap; gap: 6px; }
+  .card-foot { flex-wrap: wrap; gap: 8px 12px; }
   .desc, .card-foot { margin-left: 0; }
+  .feedback-bar { flex-wrap: wrap; }
+}
+
+@media (max-width: 380px) {
+  .hero h1 { font-size: 24px; }
+  /* stack the search input and button so both are full-width, thumb-friendly */
+  .input-row { flex-direction: column; }
+  .input-row button { padding: 12px; }
+  .method { padding: 6px 10px; font-size: 12px; }
 }
