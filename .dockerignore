@@ -1,0 +1,27 @@
+# Keep the build context small and avoid shipping huge/local-only files.
+.git/
+.venv/
+venv/
+env/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Built/large artifacts are regenerated or downloaded inside the image
+artifacts/
+*.pkl
+*.pickle
+*.npy
+data/News_Category_Dataset_v3.json
+
+# Frontend installs/builds happen in the image
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Not needed at runtime
+tests/
+notebooks/
+docs/
+*.md

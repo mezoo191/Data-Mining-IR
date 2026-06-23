@@ -1,3 +1,12 @@
+---
+title: News Search Engine
+emoji: 🔎
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
+
 # News Search Engine
 
 A from-scratch **information retrieval system** over 200,000+ news articles. The
@@ -196,26 +205,6 @@ news-search-engine/
 ├── tests/                # pytest suite (39 tests)
 └── data/                 # sample_news.jsonl (committed)
 ```
-
-## Deploying online
-
-The app is a single FastAPI service that serves both the built React UI and the
-API, so it deploys like any Python web app. Bind to `0.0.0.0` and the platform's
-`$PORT`:
-
-```bash
-pip install -r requirements.txt -r requirements-bert.txt
-python scripts/build_index.py --bert
-(cd frontend && npm install && npm run build)
-uvicorn api.main:app --host 0.0.0.0 --port $PORT --app-dir .
-```
-
-- **For a lightweight free demo**, deploy in **sample + BERT** mode (≈700 docs) —
-  low memory, fast cold start. Works on Render, Railway, Fly.io, or a Docker-based
-  Hugging Face Space.
-- **For the full-dataset semantic demo**, the 209k embeddings (~310 MB) plus the
-  model need **~1.5–2 GB RAM**, so pick a tier with ≥2 GB; the run will
-  auto-download the prebuilt model.
 
 ## Tech stack
 
