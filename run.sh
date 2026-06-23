@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# ============================================================
+#  News Search Engine - one-shot setup + launch (macOS/Linux)
+#
+#  Usage:
+#    ./run.sh            Sample dataset WITH BERT (best for a quick demo)
+#    ./run.sh lite       Sample dataset, no BERT (fastest)
+#    ./run.sh full       Full ~210k dataset, no BERT (recommended for scale)
+#    ./run.sh full bert  Full dataset WITH BERT (slow: embeds ~60k terms)
+#
+#  The browser opens automatically once the server is ready.
+# ============================================================
+set -euo pipefail
+cd "$(dirname "$0")"
+
+# BERT defaults ON for the sample, but OFF for the full dataset (too slow to
+# embed ~60k terms on a laptop) unless you explicitly pass "bert".
+USE_BERT=1
+USE_FULL=0
+BERT_EXPLICIT=0
+for arg in "$@"; do
+  [ "$arg" = "lite" ] && USE_BERT=0
+  [ "$arg" = "nobert" ] && USE_BERT=0
+  [ "$arg" = "bert" ] && { USE_BERT=1; BERT_EXPLICIT=1; }
+  [ "$arg" = "full" ] && USE_FULL=1
+done
+[ "$USE_FULL" = "1" ] && [ "$BERT_EXPLICIT" = "0" ] && USE_BERT=0
+
+# --- 0. Prerequisites ---------------------------------------
+command -v python3 >/dev/null 2>&1 || { echo "[error] Python 3 not found."; exit 1; }
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[error] Node.js / npm not found - the web UI cannot be built."
+  echo "        Install Node.js LTS from https://nodejs.org/ then run again."
+  exit 1
+fi
+
+# --- 1. Stop any previous server holding port 8000 ----------
+if command -v lsof >/dev/null 2>&1; then
+  PIDS=$(lsof -ti tcp:8000 2>/dev/null || true)
+  if [ -n "$PIDS" ]; then echo "[setup] Stopping previous server on port 8000..."; kill -9 $PIDS 2>/dev/null || true; fi
+elif command -v fuser >/dev/null 2>&1; then
+  fuser -k 8000/tcp >/dev/null 2>&1 || true
+fi
+
+# --- 2. Python virtual environment --------------------------
+if [ ! -d .venv ]; then
+  echo "[setup] Creating virtual environment..."
+  python3 -m venv .venv
+fi
+# shellcheck disable=SC1091
+source .venv/bin/activate
+
+# --- 3. Python dependencies ---------------------------------
+echo "[setup] Installing Python dependencies..."
+python -m pip install -q --upgrade pip
+pip install -q -r requirements.txt
+if [ "$USE_BERT" = "1" ]; then
+  echo "[setup] Installing BERT dependencies (large download, one time)..."
+  pip install -q -r requirements-bert.txt
+fi
+
+# --- 4. Choose dataset --------------------------------------
+DATA_ARG=""
+if [ "$USE_FULL" = "1" ]; then
+  DATASET=""
+  [ -f data/News_Category_Dataset_v3.json ] && DATASET="data/News_Category_Dataset_v3.json"
+  [ -f News_Category_Dataset_v3.json ] && DATASET="News_Category_Dataset_v3.json"
+  if [ -z "$DATASET" ]; then
+    echo "[error] Full dataset not found. Run: python scripts/download_data.py"
+    exit 1
+  fi
+  echo "[setup] Using full dataset: $DATASET"
+  DATA_ARG="--data $DATASET"
+fi
+
+# --- 5. Rebuild the index when the mode/dataset changes -----
+SIG="sample"; [ "$USE_FULL" = "1" ] && SIG="full"
+[ "$USE_BERT" = "1" ] && SIG="${SIG}+bert"
+PREVSIG=""
+[ -f artifacts/build.info ] && PREVSIG="$(cat artifacts/build.info)"
+if [ "$SIG" != "$PREVSIG" ]; then
+  [ -n "$PREVSIG" ] && echo "[setup] Build config changed ($PREVSIG -> $SIG); rebuilding..."
+  rm -f artifacts/index.pkl artifacts/bert.pkl
+fi
+
+# --- 6. Build the search index (only if missing) ------------
+if [ "$USE_BERT" = "1" ]; then
+  if [ ! -f artifacts/bert.pkl ]; then
+    echo "[setup] Building index + BERT embeddings..."
+    python scripts/build_index.py $DATA_ARG --bert
+  fi
+  [ -f artifacts/bert.pkl ] || { echo "[error] BERT embeddings were not created."; exit 1; }
+else
+  if [ ! -f artifacts/index.pkl ]; then
+    echo "[setup] Building search index..."
+    python scripts/build_index.py $DATA_ARG
+  fi
+fi
+mkdir -p artifacts && echo "$SIG" > artifacts/build.info
+
+# --- 7. Build the frontend (install once, always rebuild) ---
+(
+  cd frontend
+  [ -d node_modules ] || { echo "[setup] Installing frontend packages..."; npm install; }
+  echo "[setup] Building frontend..."
+  npm run build
+)
+[ -f frontend/dist/index.html ] || { echo "[error] Frontend build failed."; exit 1; }
+
+# --- 8. Open the browser once the server is up --------------
+(
+  for _ in $(seq 1 90); do
+    if curl -fs http://localhost:8000/api/health >/dev/null 2>&1; then
+      (command -v open >/dev/null && open http://localhost:8000) || \
+      (command -v xdg-open >/dev/null && xdg-open http://localhost:8000) || true
+      break
+    fi
+    sleep 0.7
+  done
+) &
+
+# --- 9. Launch ----------------------------------------------
+echo
+echo "[run] Starting server at http://localhost:8000  (mode: $SIG)  (Ctrl+C to stop)"
+exec uvicorn api.main:app --host 0.0.0.0 --port 8000 --app-dir .

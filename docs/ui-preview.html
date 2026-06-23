@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>News Search Engine — UI preview</title>
+<style>
+*{box-sizing:border-box;margin:0}
+body{background:#0d1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.app{max-width:860px;margin:0 auto;padding:40px 20px}
+.hero{text-align:center;margin-bottom:24px}.hero h1{font-size:32px;color:#e6edf3;font-weight:600}.logo{color:#7c5cff}
+.subtitle{color:#9aa7b4;font-size:15px;margin-top:6px}.stats{color:#5b9dff}
+.searchbar{background:#161b22;border:1px solid #2a3140;border-radius:12px;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.input-row{display:flex;gap:10px}.input-row .inp{flex:1;background:#0d1117;border:1px solid #5b9dff;border-radius:10px;padding:14px 16px;color:#e6edf3;font-size:16px}
+.btn{background:linear-gradient(135deg,#5b9dff,#7c5cff);color:#fff;border-radius:10px;padding:14px 24px;font-size:15px;font-weight:600;display:flex;align-items:center}
+.examples{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.chip{background:#1c2230;border:1px solid #2a3140;color:#9aa7b4;border-radius:999px;padding:6px 12px;font-size:13px}
+.controls{display:flex;justify-content:space-between;gap:14px;margin-top:16px;padding-top:16px;border-top:1px solid #2a3140}
+.methods{display:flex;gap:6px;flex-wrap:wrap}.method{background:#1c2230;border:1px solid #2a3140;color:#9aa7b4;border-radius:8px;padding:7px 12px;font-size:13px}
+.method.active{background:rgba(91,157,255,.16);border-color:#5b9dff;color:#5b9dff}
+.filters{display:flex;gap:14px}.filters label{display:flex;flex-direction:column;font-size:11px;color:#9aa7b4;text-transform:uppercase;letter-spacing:.5px;gap:4px}
+.sel{background:#0d1117;border:1px solid #2a3140;color:#e6edf3;border-radius:8px;padding:6px 22px 6px 8px;font-size:14px}
+.results-meta{display:flex;justify-content:space-between;align-items:center;color:#9aa7b4;font-size:14px;margin:24px 2px 12px}.results-meta strong{color:#e6edf3}
+.timing{background:#1c2230;border:1px solid #2a3140;padding:4px 10px;border-radius:999px;font-size:12px}
+.cards{display:flex;flex-direction:column;gap:12px}.card{background:#161b22;border:1px solid #2a3140;border-radius:12px;padding:16px 18px}
+.card-head{display:flex;gap:10px;align-items:baseline}.rank{color:#9aa7b4;font-size:13px;min-width:28px}.headline{color:#e6edf3;font-size:16px;font-weight:600}
+.desc{color:#9aa7b4;font-size:14px;line-height:1.5;margin:8px 0 10px 38px}.card-foot{display:flex;gap:14px;align-items:center;margin-left:38px;font-size:12px}
+.cat{background:rgba(63,185,80,.14);color:#3fb950;border-radius:6px;padding:2px 8px;font-weight:600}.date{color:#9aa7b4}.score{color:#9aa7b4;margin-left:auto}
+</style></head><body><div class="app">
+<div class="hero"><h1><span class="logo">&#9670;</span> News Search Engine</h1>
+<div class="subtitle">TF-IDF information retrieval with query expansion <span class="stats">&middot; 209,527 docs &middot; 62,090 terms</span></div></div>
+<div class="searchbar"><div class="input-row"><div class="inp">covid vaccine health</div><div class="btn">Search</div></div>
+<div class="examples"><span class="chip">election president</span><span class="chip">movie film review</span><span class="chip">stock market crash</span><span class="chip">climate change</span></div>
+<div class="controls"><div class="methods"><span class="method active">TF-IDF</span><span class="method">Relevance Feedback</span><span class="method">WordNet</span><span class="method">BERT</span><span class="method">PRF + BERT</span></div>
+<div class="filters"><label>Results<select class="sel"><option>10</option></select></label><label>Category<select class="sel"><option>All</option></select></label></div></div></div>
+<div class="results-meta"><span><strong>10</strong> results for <em>&ldquo;covid vaccine health&rdquo;</em></span><span class="timing">tfidf &middot; 3.1 ms</span></div>
+<div class="cards">
+<div class="card"><div class="card-head"><span class="rank">#1</span><span class="headline">Over 4 Million Americans Roll Up Sleeves For Omicron-Targeted COVID Boosters</span></div><div class="desc">Health experts said it is too early to predict whether demand would match up with the doses ordered for the fall.</div><div class="card-foot"><span class="cat">U.S. NEWS</span><span class="date">2022-09-23</span><span class="score">score 0.0419</span></div></div>
+<div class="card"><div class="card-head"><span class="rank">#2</span><span class="headline">CDC Panel Recommends Updated COVID Vaccines For Most Americans</span></div><div class="desc">The recommendation covers the reformulated shots targeting the latest circulating variants.</div><div class="card-foot"><span class="cat">WELLNESS</span><span class="date">2022-09-01</span><span class="score">score 0.0387</span></div></div>
+<div class="card"><div class="card-head"><span class="rank">#3</span><span class="headline">What Doctors Want You To Know About The New Booster Shots</span></div><div class="desc">A look at who is eligible, when to get it, and how it interacts with flu season.</div><div class="card-foot"><span class="cat">HEALTHY LIVING</span><span class="date">2022-08-30</span><span class="score">score 0.0361</span></div></div>
+<div class="card"><div class="card-head"><span class="rank">#4</span><span class="headline">How The Pandemic Reshaped Public Health Messaging</span></div><div class="desc">Officials are rethinking how they communicate risk after three years of shifting guidance.</div><div class="card-foot"><span class="cat">WELLNESS</span><span class="date">2022-07-19</span><span class="score">score 0.0334</span></div></div>
+</div></div></body></html>

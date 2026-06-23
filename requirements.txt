@@ -1,0 +1,7 @@
+# Core runtime (engine + API)
+nltk>=3.8
+fastapi>=0.110
+uvicorn[standard]>=0.27
+
+# Optional: semantic (BERT) query expansion. Heavy (~torch). Install separately:
+#   pip install -r requirements-bert.txt

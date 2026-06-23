@@ -1,0 +1,38 @@
+# ---- Data (large files are not committed; see scripts/download_data.py) ----
+News_Category_Dataset_v3.json
+data/News_Category_Dataset_v3.json
+*.rar
+data/*.json
+!data/sample_news.jsonl
+
+# ---- Built search index / model artifacts ----
+artifacts/
+*.pkl
+*.pickle
+*.npy
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+
+# ---- Node / frontend ----
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
